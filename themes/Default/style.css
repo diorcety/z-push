@@ -1,0 +1,11 @@
+.go-module-icon-zpush , .go-menu-icon-zpush{
+	background:url('images/z-push.png');
+}
+
+.go-tab-icon-zpush {
+	background-image: none !important;
+}
+
+.go-link-icon-4 {
+	background-image: url('images/z-push.png') !important;
+}
