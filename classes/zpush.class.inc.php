@@ -15,7 +15,7 @@ class zpush extends db
         $device['device_id'] = $devid;
         $device['policy_key'] = $policykey;
 
-        return $this->insert_row('sync_devices', $device);
+        return $this->insert_row('as_devices', $device);
     }
 
     function removeDevice($userid, $devid)

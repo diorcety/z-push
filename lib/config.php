@@ -92,7 +92,7 @@
     define('SYNC_FILTERTIME_MAX', SYNC_FILTERTYPE_ALL);
 
     // The data providers that we are using (see configuration below)
-    $BACKEND_PROVIDER = "BackendICS";
+    $BACKEND_PROVIDER = 'GOBackend';
 
     // ************************
     //  BackendICS settings
@@ -100,6 +100,17 @@
 
     // Defines the server to which we want to connect
     define('MAPI_SERVER', 'file:///var/run/zarafa');
+    
+    
+    // ************************
+    //  BackendGO settings
+    // ************************
+    //
+
+    // Define Group-Office path
+    define('GO_PATH', '/usr/share/groupoffice/');
+    // Defines the GO log file
+    define('GO_LOGFILE', BASE_PATH . 'golog.txt');
 
 
     // ************************
