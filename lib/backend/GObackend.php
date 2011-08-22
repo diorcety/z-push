@@ -23,7 +23,7 @@ class GOBackend extends BackendDiff
     const FOLDER_CONTACTS = 'Contacts';
     const FOLDER_TASKS = 'Tasks';
     const FOLDER_CALANDAR = 'Calandar';
-    
+
     /** Variables **/
     var $_user = null;
     var $_userid = null;
@@ -32,24 +32,26 @@ class GOBackend extends BackendDiff
     var $_devid = null;
     var $_protocolversion = null;
     var $GO_SYNC;
-    
+    var $GO_ADDRESSBOOK;
+
     function GOBackend()
     {
         // Get module state in GO
-        require_once(GO_PATH.'Group-Office.php');
-        
+        require_once(GO_PATH . 'Group-Office.php');
+
         global $GO_CONFIG;
         global $GO_MODULES;
-                
-        if(!isset($GO_MODULES->modules['z-push']))
-	    die('Z-Push module is not installed. Install it at Start menu -> Modules');
-    
-        // Create Connector
-        require_once($GO_CONFIG->module_path . 'z-push/classes/zpush.class.inc.php');
 
+        if (!isset($GO_MODULES->modules['z-push']))
+            die('Z-Push module is not installed. Install it at Start menu -> Modules');
+
+        // Create Connectors
+        require_once($GO_CONFIG->module_path . 'z-push/classes/zpush.class.inc.php');
+        require_once($GO_CONFIG->module_path . 'addressbook/classes/addressbook.class.inc.php');
         $this->GO_SYNC = new zpush();
+        $this->GO_ADDRESSBOOK = new addressbook();
     }
-    
+
     function Logon($username, $domain, $password)
     {
         global $GO_CONFIG;
@@ -62,7 +64,7 @@ class GOBackend extends BackendDiff
         $user_data = $GO_USERS->get_user_by_email($username . '@' . $domain);
         if (!$user_data)
             return false;
-        
+
         if ($GO_AUTH->authenticate($user_data['username'], $password)) {
             $this->_userid = $user_data['id'];
             $this->_username = $user_data['username'];
@@ -76,8 +78,7 @@ class GOBackend extends BackendDiff
 
     function Logoff()
     {
-        if($this->_userid !== null)
-        {
+        if ($this->_userid !== null) {
             $this->log("Logoff $this->_username@$this->_domain: $this->_userid");
             $this->_userid = null;
             $this->_username = null;
@@ -110,7 +111,7 @@ class GOBackend extends BackendDiff
     {
         return new ExportChangesDiff($this, $folderid);
     }
-    
+
     /**
      * Return a list of available folders
      *
@@ -119,15 +120,27 @@ class GOBackend extends BackendDiff
     function GetFolderList()
     {
         $folders = array();
-        
-        //Add  folders for contacts calendars and tasks
+
+        //Add Calendars
         $folders[] = $this->StatFolder(self::FOLDER_CALANDAR);
+        $this->GO_ADDRESSBOOK->get_user_addressbooks($this->_userid);
+
+        //Add AddressBooks
         $folders[] = $this->StatFolder(self::FOLDER_CONTACTS);
+        while ($record = $this->GO_ADDRESSBOOK->next_record())
+        {
+            $folders[] = $this->StatFolder(self::FOLDER_CONTACTS . '/' . $record['id']);
+        }
+
+        //Add Tasks
         $folders[] = $this->StatFolder(self::FOLDER_TASKS);
 
+        $this->log("==== FOLDER LIST ====");
+        $this->log(print_r($folders, true));
+        $this->log("=====================");
         return $folders;
     }
-    
+
     /**
      * Retrieve folder
      *
@@ -139,18 +152,68 @@ class GOBackend extends BackendDiff
     {
         $folder = new SyncFolder();
         $folder->serverid = $id;
-        $folder->displayname = $id;
-        $folder->parentid = self::FOLDER_ROOT;
-        if ($id == self::FOLDER_CALANDAR) {
-            $folder->type = SYNC_FOLDER_TYPE_APPOINTMENT;
-        } else if ($id == self::FOLDER_CONTACTS) {
-            $folder->type = SYNC_FOLDER_TYPE_CONTACT;
-        } else if ($id == self::FOLDER_TASKS) {
-            $folder->type = SYNC_FOLDER_TYPE_TASK;
+        $folder->parentid = $this->getFolderParent($id);
+
+        if (substr($id, 0, strlen(self::FOLDER_CALANDAR)) == self::FOLDER_CALANDAR) {
+            // CALENDARS
+            if ($id == self::FOLDER_CALANDAR) {
+                $folder->displayname = $this->getFolderId($id);
+                $folder->type = SYNC_FOLDER_TYPE_APPOINTMENT;
+            } else {
+                $folder->displayname = $this->getFolderId($id);
+                $folder->type = SYNC_FOLDER_TYPE_USER_APPOINTMENT;
+            }
+
+        } else if (substr($id, 0, strlen(self::FOLDER_CONTACTS)) == self::FOLDER_CONTACTS) {
+            // CONTACTS
+            if ($id == self::FOLDER_CONTACTS) {
+                $folder->displayname = $this->getFolderId($id);
+                $folder->type = SYNC_FOLDER_TYPE_CONTACT;
+            } else {
+                $addressBook = $this->GO_ADDRESSBOOK->get_addressbook($this->getFolderId($id));
+                $folder->displayname = $addressBook['name'];
+                $folder->type = SYNC_FOLDER_TYPE_USER_CONTACT;
+            }
+
+        } else if (substr($id, 0, strlen(self::FOLDER_TASKS)) == self::FOLDER_TASKS) {
+            // TASKS
+            if ($id == self::FOLDER_TASKS) {
+                $folder->displayname = $this->getFolderId($id);
+                $folder->type = SYNC_FOLDER_TYPE_TASK;
+            } else {
+                $folder->displayname = $this->getFolderId($id);
+                $folder->type = SYNC_FOLDER_TYPE_USER_TASK;
+            }
         }
 
         return $folder;
     }
+
+
+    function getFolderParent($id)
+    {
+        $parts = explode('/', $id);
+        if (sizeof($parts) < 2) {
+            return self::FOLDER_ROOT;
+        }
+        else {
+            $mod = $parts[sizeof($parts) - 1];
+            unset($parts[sizeof($parts) - 1]);
+            return $parent = implode('/', $parts);
+        }
+    }
+
+    function getFolderId($id)
+    {
+        $parts = explode('/', $id);
+        if (sizeof($parts) < 2) {
+            return $id;
+        }
+        else {
+            return $parts[sizeof($parts) - 1];
+        }
+    }
+
     /**
      * Stat folder. Note that since the only thing that can ever change for a
      * folder is the name, we use that as the 'mod' value.
@@ -163,9 +226,9 @@ class GOBackend extends BackendDiff
     {
         $stat = array();
         $stat['id'] = $id;
-        $stat['mod'] = $id;
-        $stat['parent'] = self::FOLDER_ROOT;
-        
+        $stat['mod'] = $this->getFolderId($id);
+        $stat['parent'] = $this->getFolderParent($id);
+
         return $stat;
     }
 
@@ -187,12 +250,18 @@ class GOBackend extends BackendDiff
     function GetMessageList($folderid, $cutoffdate)
     {
         $messages = array();
-        $checkId = array();
-        if ($folderid == self::FOLDER_CONTACTS) {
-        }
-        else if ($folderid == self::FOLDER_CALANDAR) {
-        }
-        else if ($folderid == self::FOLDER_TASKS) {
+        if (substr($folderid, 0, strlen(self::FOLDER_CALANDAR)) == self::FOLDER_CALANDAR) {
+            if ($folderid == self::FOLDER_CALANDAR) {
+            } else {
+            }
+        } else if (substr($folderid, 0, strlen(self::FOLDER_CONTACTS)) == self::FOLDER_CONTACTS) {
+            if ($folderid == self::FOLDER_CONTACTS) {
+            } else {
+            }
+        } else if (substr($folderid, 0, strlen(self::FOLDER_TASKS)) == self::FOLDER_TASKS) {
+            if ($folderid == self::FOLDER_TASKS) {
+            } else {
+            }
         }
         return $messages;
     }
@@ -347,11 +416,11 @@ class GOBackend extends BackendDiff
     {
         return array();
     }
-    
-    private function log($message) {
-        if (GO_LOGFILE != '')
-        {
-            @$fp = fopen(GO_LOGFILE ,'a+');
+
+    private function log($message)
+    {
+        if (GO_LOGFILE != '') {
+            @$fp = fopen(GO_LOGFILE, 'a+');
             @$date = strftime('%x %X');
             @fwrite($fp, "$date ['. getmypid() .'] : $message\n");
             @fclose($fp);
