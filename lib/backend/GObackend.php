@@ -119,6 +119,8 @@ class GOBackend extends BackendDiff
      */
     function GetFolderList()
     {
+        $this->log("Get Folder List");
+
         $folders = array();
 
         //Add Calendars
@@ -140,58 +142,80 @@ class GOBackend extends BackendDiff
         return $folders;
     }
 
+    function isContacts($uri)
+    {
+        return substr($uri, 0, strlen(self::FOLDER_CONTACTS)) == self::FOLDER_CONTACTS;
+    }
+
+    function isCalendars($uri)
+    {
+        return substr($uri, 0, strlen(self::FOLDER_CALANDAR)) == self::FOLDER_CALANDAR;
+    }
+
+    function isTasks($uri)
+    {
+        return substr($uri, 0, strlen(self::FOLDER_TASKS)) == self::FOLDER_TASKS;
+    }
+
+    function getAddressBookId($uri)
+    {
+        if ($uri == self::FOLDER_CONTACTS) {
+            $addressBookId = $this->GO_AS->getDefaultAddressBook($this->_userid);
+            if ($addressBookId == null) {
+                $this->log('Warning! No default AddressBook!');
+                return null;
+            }
+        } else {
+            $addressBookId = $this->getFolderId($uri);
+        }
+        return $addressBookId;
+    }
+
     /**
      * Retrieve folder
      *
-     * @param string $id  The folder id
+     * @param string $uri  The folder id
      *
      * @return SyncFolder
      */
-    function GetFolder($id)
+    function GetFolder($uri)
     {
-        $folder = new SyncFolder();
-        $folder->serverid = $id;
-        $folder->parentid = $this->getFolderParent($id);
+        $this->log("Get Folder $uri");
 
-        if (substr($id, 0, strlen(self::FOLDER_CALANDAR)) == self::FOLDER_CALANDAR) {
+        $folder = new SyncFolder();
+        $folder->serverid = $uri;
+        $folder->parentid = $this->getFolderParent($uri);
+
+        if ($this->isCalendars($uri)) {
             // CALENDARS
-            if ($id == self::FOLDER_CALANDAR) {
-                $folder->displayname = $this->getFolderId($id);
+            if ($uri == self::FOLDER_CALANDAR) {
+                $folder->displayname = $this->getFolderId($uri);
                 $folder->type = SYNC_FOLDER_TYPE_APPOINTMENT;
             } else {
-                $folder->displayname = $this->getFolderId($id);
+                $folder->displayname = $this->getFolderId($uri);
                 $folder->type = SYNC_FOLDER_TYPE_USER_APPOINTMENT;
             }
-
-        } else if (substr($id, 0, strlen(self::FOLDER_CONTACTS)) == self::FOLDER_CONTACTS) {
+        } else if ($this->isContacts($uri)) {
             // CONTACTS
-            if ($id == self::FOLDER_CONTACTS) {
+            if ($uri == self::FOLDER_CONTACTS)
                 $folder->type = SYNC_FOLDER_TYPE_CONTACT;
-
-                $addressBookId = $this->GO_AS->getDefaultAddressBook($this->_userid);
-                if ($addressBookId == null) {
-                    $this->log('Warning! No default AddressBook!');
-                    return null;
-                }
-            } else {
+            else
                 $folder->type = SYNC_FOLDER_TYPE_USER_CONTACT;
 
-                $addressBookId = $this->getFolderId($id);
-            }
-
+            $addressBookId = $this->getAddressBookId($uri);
             $addressBook = $this->GO_ADDRESSBOOK->get_addressbook($addressBookId);
             if ($addressBook == null) {
                 $this->log('Error! Invalid AddressBook: ' . $addressBookId);
                 return null;
             }
             $folder->displayname = $addressBook['name'];
-        } else if (substr($id, 0, strlen(self::FOLDER_TASKS)) == self::FOLDER_TASKS) {
+        } else if ($this->isTasks($uri)) {
             // TASKS
-            if ($id == self::FOLDER_TASKS) {
-                $folder->displayname = $this->getFolderId($id);
+            if ($uri == self::FOLDER_TASKS) {
+                $folder->displayname = $this->getFolderId($uri);
                 $folder->type = SYNC_FOLDER_TYPE_TASK;
             } else {
-                $folder->displayname = $this->getFolderId($id);
+                $folder->displayname = $this->getFolderId($uri);
                 $folder->type = SYNC_FOLDER_TYPE_USER_TASK;
             }
         }
@@ -254,40 +278,133 @@ class GOBackend extends BackendDiff
 
     function GetWasteBasket()
     {
+        $this->log("Get Waste Basket");
+
         return false;
     }
 
-    function GetMessageList($folderid, $cutoffdate)
+    function GetMessageList($uri, $cutoffdate)
     {
+        $this->log("Get Message List $uri ($cutoffdate)");
+
         $messages = array();
-        if (substr($folderid, 0, strlen(self::FOLDER_CALANDAR)) == self::FOLDER_CALANDAR) {
-            if ($folderid == self::FOLDER_CALANDAR) {
+        if ($this->isCalendars($uri)) {
+            if ($uri == self::FOLDER_CALANDAR) {
             } else {
             }
-        } else if (substr($folderid, 0, strlen(self::FOLDER_CONTACTS)) == self::FOLDER_CONTACTS) {
-            if ($folderid == self::FOLDER_CONTACTS) {
-            } else {
+        } else if ($this->isContacts($uri)) {
+            $addressBookId = $this->getAddressBookId($uri);
+            $this->GO_ADDRESSBOOK->get_contacts($addressBookId);
+            while ($record = $this->GO_ADDRESSBOOK->next_record())
+            {
+                $message = array();
+                $message['mod'] = $record['mtime'];
+                $message['id'] = $record['id'];
+                $message['flags'] = 0;
+
+                $messages[] = $message;
             }
-        } else if (substr($folderid, 0, strlen(self::FOLDER_TASKS)) == self::FOLDER_TASKS) {
-            if ($folderid == self::FOLDER_TASKS) {
+        } else if ($this->isTasks($uri)) {
+            if ($uri == self::FOLDER_TASKS) {
             } else {
             }
         }
         return $messages;
     }
 
-    function StatMessage($folderid, $id)
+    function StatMessage($uri, $id)
     {
-        return false;
+        $message = array();
+        if ($this->isCalendars($uri)) {
+        } else if ($this->isContacts($uri)) {
+            $record = $this->GO_ADDRESSBOOK->get_contact($id);
+            $message['mod'] = $record['mtime'];
+            $message['id'] = $record['id'];
+            $message['flags'] = 0;
+        } else if ($this->isTasks($uri)) {
+        }
+        return $message;
     }
 
-    function GetMessage($folderid, $id, $truncsize, $mimesupport = 0)
+    function CreateSyncContact($vars)
     {
-        return false;
+        $contact = new SyncContact();
+
+        $contact->firstname = $vars['first_name'];
+        $contact->middlename = $vars['middle_name'];
+        $contact->lastname = $vars['last_name'];
+        $contact->title = $vars['title'];
+        $contact->birthday = $vars['birthday'];
+        $contact->email1address = $vars['email'];
+        $contact->email2address = $vars['email2'];
+        $contact->email3address = $vars['email3'];
+        $contact->department = $vars['department'];
+        $contact->jobtitle = $vars['function'];
+        $contact->homephonenumber = $vars['home_phone'];
+        $contact->businessphonenumber = $vars['work_phone'];
+        $contact->homefaxnumber = $vars['fax'];
+        $contact->businessfaxnumber = $vars['work_fax'];
+        $contact->mobilephonenumber = $vars['cellular'];
+        $contact->homecountry = $vars['country'];
+        $contact->homestate = $vars['state'];
+        $contact->homecity = $vars['city'];
+        $contact->homepostalcode = $vars['zip'];
+        $contact->homestreet = $vars['address'];
+
+        return $contact;
     }
 
-    function DeleteMessage($folderid, $id)
+    function CreateGOContact($contact)
     {
+        $vars = Array();
+
+        $vars['first_name'] = $contact->firstname;
+        $vars['middle_name'] = $contact->middlename;
+        $vars['last_name'] = $contact->lastname;
+        $vars['title'] = $contact->title;
+        $vars['birthday'] = $contact->birthday;
+        $vars['email'] = $contact->email1address;
+        $vars['email2'] = $contact->email2address;
+        $vars['email3'] = $contact->email3address;
+        $vars['department'] = $contact->department;
+        $vars['function'] = $contact->jobtitle;
+        $vars['home_phone'] = $contact->homephonenumber;
+        $vars['work_phone'] = $contact->businessphonenumber;
+        $vars['fax'] = $contact->homefaxnumber;
+        $vars['work_fax'] = $contact->businessfaxnumber;
+        $vars['cellular'] = $contact->mobilephonenumber;
+        $vars['country'] = $contact->homecountry;
+        $vars['state'] = $contact->homestate;
+        $vars['city'] = $contact->homecity;
+        $vars['zip'] = $contact->homepostalcode;
+        $vars['address'] = $contact->homestreet;
+
+        return $vars;
+    }
+
+    function GetMessage($uri, $id, $truncsize, $mimesupport = 0)
+    {
+        $this->log("Get Message $id from $uri");
+
+        if ($this->isCalendars($uri)) {
+        } else if ($this->isContacts($uri)) {
+            $record = $this->GO_ADDRESSBOOK->get_contact($id);
+            if ($record != null)
+                return $this->CreateSyncContact($record);
+        } else if ($this->isTasks($uri)) {
+        }
+        return null;
+    }
+
+    function DeleteMessage($uri, $id)
+    {
+        $this->log("Delete Message $id from $uri");
+
+        if ($this->isCalendars($uri)) {
+        } else if ($this->isContacts($uri)) {
+            return $this->GO_ADDRESSBOOK->delete_contact($id) == 1 ? true : false;
+        } else if ($this->isTasks($uri)) {
+        }
         return false;
     }
 
