@@ -31,7 +31,7 @@ class GOBackend extends BackendDiff
     var $_domain = null;
     var $_devid = null;
     var $_protocolversion = null;
-    var $GO_SYNC;
+    var $GO_AS;
     var $GO_ADDRESSBOOK;
 
     function GOBackend()
@@ -48,7 +48,7 @@ class GOBackend extends BackendDiff
         // Create Connectors
         require_once($GO_CONFIG->module_path . 'z-push/classes/zpush.class.inc.php');
         require_once($GO_CONFIG->module_path . 'addressbook/classes/addressbook.class.inc.php');
-        $this->GO_SYNC = new zpush();
+        $this->GO_AS = new zpush();
         $this->GO_ADDRESSBOOK = new addressbook();
     }
 
@@ -123,21 +123,20 @@ class GOBackend extends BackendDiff
 
         //Add Calendars
         $folders[] = $this->StatFolder(self::FOLDER_CALANDAR);
-        $this->GO_ADDRESSBOOK->get_user_addressbooks($this->_userid);
 
         //Add AddressBooks
         $folders[] = $this->StatFolder(self::FOLDER_CONTACTS);
-        while ($record = $this->GO_ADDRESSBOOK->next_record())
+        foreach ($this->GO_AS->getAddressBooks($this->_userid) as $addressBookId)
         {
-            $folders[] = $this->StatFolder(self::FOLDER_CONTACTS . '/' . $record['id']);
+            $folders[] = $this->StatFolder(self::FOLDER_CONTACTS . '/' . $addressBookId);
         }
 
         //Add Tasks
         $folders[] = $this->StatFolder(self::FOLDER_TASKS);
 
-        $this->log("==== FOLDER LIST ====");
+        $this->log('==== FOLDER LIST ====');
         $this->log(print_r($folders, true));
-        $this->log("=====================");
+        $this->log('=====================');
         return $folders;
     }
 
@@ -167,14 +166,25 @@ class GOBackend extends BackendDiff
         } else if (substr($id, 0, strlen(self::FOLDER_CONTACTS)) == self::FOLDER_CONTACTS) {
             // CONTACTS
             if ($id == self::FOLDER_CONTACTS) {
-                $folder->displayname = $this->getFolderId($id);
                 $folder->type = SYNC_FOLDER_TYPE_CONTACT;
+
+                $addressBookId = $this->GO_AS->getDefaultAddressBook($this->_userid);
+                if ($addressBookId == null) {
+                    $this->log('Warning! No default AddressBook!');
+                    return null;
+                }
             } else {
-                $addressBook = $this->GO_ADDRESSBOOK->get_addressbook($this->getFolderId($id));
-                $folder->displayname = $addressBook['name'];
                 $folder->type = SYNC_FOLDER_TYPE_USER_CONTACT;
+
+                $addressBookId = $this->getFolderId($id);
             }
 
+            $addressBook = $this->GO_ADDRESSBOOK->get_addressbook($addressBookId);
+            if ($addressBook == null) {
+                $this->log('Error! Invalid AddressBook: ' . $addressBookId);
+                return null;
+            }
+            $folder->displayname = $addressBook['name'];
         } else if (substr($id, 0, strlen(self::FOLDER_TASKS)) == self::FOLDER_TASKS) {
             // TASKS
             if ($id == self::FOLDER_TASKS) {
@@ -331,7 +341,7 @@ class GOBackend extends BackendDiff
             return false;
         }
 
-        $key = $this->GO_SYNC->getPolicyKey($this->_userid, $devid);
+        $key = $this->GO_AS->getPolicyKey($this->_userid, $devid);
 
         // Generate new key
         if ($key === null) {
@@ -341,10 +351,10 @@ class GOBackend extends BackendDiff
             if (strcasecmp('validate', $devid) != 0) {
                 $this->log("Add device $devid to $this->_username@$this->_domain");
                 // Create a device registration if doesn't exists
-                $this->GO_SYNC->addDevice($this->_userid, $devid);
+                $this->GO_AS->addDevice($this->_userid, $devid);
 
                 // Set default policy key
-                $this->setPolicyKey($devid, $key);
+                $this->setPolicyKey($key, $devid);
             }
         }
 
@@ -361,7 +371,7 @@ class GOBackend extends BackendDiff
     function setPolicyKey($policykey, $devid)
     {
         $this->log("Set $this->_username@$this->_domain device $devid police key: $policykey");
-        return $this->GO_SYNC->setPolicyKey($this->_userid, $devid, $policykey);
+        return $this->GO_AS->setPolicyKey($this->_userid, $devid, $policykey);
     }
 
     /**
@@ -379,7 +389,7 @@ class GOBackend extends BackendDiff
             return false;
         }
 
-        $status = $this->GO_SYNC->getStatus($this->_userid, $devid);
+        $status = $this->GO_AS->getStatus($this->_userid, $devid);
         if ($status !== null)
             return $status;
 
@@ -404,7 +414,7 @@ class GOBackend extends BackendDiff
         }
 
         $this->log("Set $this->_username@$this->_domain device $devid status: $status");
-        return $this->GO_SYNC->setStatus($this->_userid, $devid, $status);
+        return $this->GO_AS->setStatus($this->_userid, $devid, $status);
     }
 
     function AlterPing()
