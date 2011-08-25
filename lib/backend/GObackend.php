@@ -354,10 +354,14 @@ class GOBackend extends BackendDiff
         return $contact;
     }
 
-    function CreateGOContact($contact)
+    function CreateGOContact($contact, $addressbookId, $id = false)
     {
         $vars = Array();
 
+        if ($id != false)
+            $vars['id'] = $id;
+        $vars['addressbook_id'] = $addressbookId;
+        $vars['user_id'] = $this->_userid;
         $vars['first_name'] = $contact->firstname;
         $vars['middle_name'] = $contact->middlename;
         $vars['last_name'] = $contact->lastname;
@@ -413,8 +417,22 @@ class GOBackend extends BackendDiff
         return false;
     }
 
-    function ChangeMessage($folderid, $id, $message)
+    function ChangeMessage($uri, $id, $message)
     {
+        $this->log("Change Message $id from $uri");
+
+        if ($this->isCalendars($uri)) {
+        } else if ($this->isContacts($uri)) {
+            $addressBookId = $this->getAddressBookId($uri);
+            $contact = $this->CreateGOContact($message, $addressBookId, $id);
+            if ($id == false) {
+                $id = $this->GO_ADDRESSBOOK->add_contact($contact);
+            } else {
+                $this->GO_ADDRESSBOOK->update_contact($contact);
+            }
+            return $this->StatMessage($uri, $id);
+        } else if ($this->isTasks($uri)) {
+        }
         return false;
     }
 
@@ -544,7 +562,8 @@ class GOBackend extends BackendDiff
         return array();
     }
 
-    private function log($message)
+    private
+    function log($message)
     {
         if (GO_LOGFILE != '') {
             @$fp = fopen(GO_LOGFILE, 'a+');
