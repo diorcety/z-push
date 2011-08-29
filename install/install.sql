@@ -9,6 +9,10 @@ CREATE TABLE IF NOT EXISTS `as_devices` (
   `device_id` VARCHAR(64) NOT NULL ,
   `policy_key` INT NOT NULL DEFAULT 0,
   `status` INT NOT NULL DEFAULT 1,
+  `device` VARCHAR(64) ,
+  `agent` VARCHAR(64) ,
+  `first_sync` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ,
+  `last_sync` TIMESTAMP ,
   PRIMARY KEY (`user_id`, `device_id`),
   FOREIGN KEY (`user_id`) REFERENCES  `go_users`(`ìd`) ON DELETE CASCADE
 ) ENGINE = MyISAM DEFAULT CHARSET = utf8;

@@ -1,1 +1,2 @@
 modules/z-push/MainPanel.js
+modules/z-push/AddressBookGrid.js

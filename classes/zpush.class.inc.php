@@ -8,9 +8,9 @@ class zpush extends db
         return $this->next_record();
     }
 
-    function addDevice($userid, $devid)
+    function addDevice($userid, $devid, $device = "", $agent = "")
     {
-        return $this->query("INSERT INTO as_devices (user_id, device_id) VALUES (?,?)", array('i', 's'), array($userid, $devid));
+        return $this->query("INSERT INTO as_devices (user_id, device_id, device, agent) VALUES (?,?,?,?)", array('i', 's', 's', 's'), array($userid, $devid, $device, $agent));
     }
 
     function removeDevice($userid, $devid)
@@ -27,6 +27,11 @@ class zpush extends db
         return null;
     }
 
+    function updateLastSync($userid, $devid)
+    {
+        return $this->query("UPDATE as_devices SET last_sync=NOW() WHERE user_id=? AND device_id=?", array('i', 's'), array($userid, $devid));
+    }
+    
     function setPolicyKey($userid, $devid, $policykey)
     {
         return $this->query("UPDATE as_devices SET policy_key=? WHERE user_id=? AND device_id=?", array('i', 'i', 's'), array($policykey, $userid, $devid));

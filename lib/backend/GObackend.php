@@ -80,6 +80,9 @@ class GOBackend extends BackendDiff
     {
         if ($this->_userid !== null) {
             $this->log("Logoff $this->_username@$this->_domain: $this->_userid");
+            if (strcasecmp('validate', $this->_devid) != 0) {
+                $this->GO_AS->updateLastSync($this->_userid, $this->_devid);
+            }
             $this->_userid = null;
             $this->_username = null;
             $this->_domain = null;
@@ -485,8 +488,10 @@ class GOBackend extends BackendDiff
             //android sends 'validate' as deviceid, it does not need to be added to the device list
             if (strcasecmp('validate', $devid) != 0) {
                 $this->log("Add device $devid to $this->_username@$this->_domain");
+
+                global $devtype, $useragent;
                 // Create a device registration if doesn't exists
-                $this->GO_AS->addDevice($this->_userid, $devid);
+                $this->GO_AS->addDevice($this->_userid, $devid, $devtype, $useragent);
 
                 // Set default policy key
                 $this->setPolicyKey($key, $devid);
