@@ -2,6 +2,17 @@
 
 class zpush extends db
 {
+    function getDevices($userid)
+    {
+        $this->query("SELECT device_id FROM as_devices WHERE user_id=?", array('i'), array($userid));
+        $result = Array();
+        while ($record = $this->next_record())
+        {
+            $result [] = $record['device_id'];
+        }
+        return $result;
+    }
+
     function getDevice($userid, $devid)
     {
         $this->query("SELECT * FROM as_devices WHERE user_id=? AND device_id=?", array('i', 's'), array($userid, $devid));
@@ -31,7 +42,7 @@ class zpush extends db
     {
         return $this->query("UPDATE as_devices SET last_sync=NOW() WHERE user_id=? AND device_id=?", array('i', 's'), array($userid, $devid));
     }
-    
+
     function setPolicyKey($userid, $devid, $policykey)
     {
         return $this->query("UPDATE as_devices SET policy_key=? WHERE user_id=? AND device_id=?", array('i', 'i', 's'), array($policykey, $userid, $devid));
@@ -73,7 +84,7 @@ class zpush extends db
         {
             $result [] = $record['addressbook_id'];
         }
-        return result;
+        return $result;
     }
 
     function addAddressBook($userid, $addressbookid)

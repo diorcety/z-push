@@ -16,16 +16,23 @@
 require_once("../../Group-Office.php");
 $GO_SECURITY->json_authenticate('z-push');
 
-require_once ($GO_MODULES->modules['z-push']['class_path'] . "zpush.class.inc.php");
+require_once($GO_MODULES->modules['z-push']['class_path'] . 'zpush.class.inc.php');
+require_once($GO_MODULES->modules['addressbook']['class_path'] . 'addressbook.class.inc.php');
+
 //require_once ($GO_LANGUAGE->get_language_file('z-push'));
-
-$notes = new notes();
-
+$GO_AS = new zpush();
 
 try {
 
     switch ($_REQUEST['task'])
     {
+        case 'delete_device':
+            $id = isset($_REQUEST['id']) ? ($_REQUEST['id']) : null;
+            if ($id !== null) {
+                $result = $GO_AS->removeDevice($GO_SECURITY->user_id, $id);
+                $response['success'] = $result;
+            }
+            break;
         /* {TASKSWITCH} */
     }
 } catch (Exception $e)

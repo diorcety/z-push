@@ -9,7 +9,7 @@ GO.zpush.MainPanel = function(config) {
         config = {};
     }
 
-    var centerPanel = new GO.zpush.AddressBookGrid({
+    var centerPanel = new GO.zpush.DeviceGrid({
         region:'center',
         autoScroll:true,
         width:250,

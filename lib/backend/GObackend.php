@@ -46,8 +46,8 @@ class GOBackend extends BackendDiff
             die('Z-Push module is not installed. Install it at Start menu -> Modules');
 
         // Create Connectors
-        require_once($GO_CONFIG->module_path . 'z-push/classes/zpush.class.inc.php');
-        require_once($GO_CONFIG->module_path . 'addressbook/classes/addressbook.class.inc.php');
+        require_once($GO_MODULES->modules['z-push']['class_path'] . 'zpush.class.inc.php');
+        require_once($GO_MODULES->modules['addressbook']['class_path'] . 'addressbook.class.inc.php');
         $this->GO_AS = new zpush();
         $this->GO_ADDRESSBOOK = new addressbook();
     }
