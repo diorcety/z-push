@@ -10,10 +10,8 @@ GO.zpush.DeviceGrid = function(config) {
         config = {};
     }
 
-    config.title = GO.zpush.lang.deviceGrid.title;
-    config.layout = 'fit';
     config.autoScroll = true;
-    config.split = true;
+    
     config.store = new GO.data.JsonStore({
         /*
          * Here we store our remotely-loaded JSON data from json.php?task=devices
@@ -31,7 +29,7 @@ GO.zpush.DeviceGrid = function(config) {
     /*
      * ColumnModel used by our DeviceGrid
      */
-    var DeviceModule = new Ext.grid.ColumnModel(
+    var DeviceModel = new Ext.grid.ColumnModel(
             [
                 {
                     header: GO.zpush.lang.deviceGrid.columns.id,
@@ -111,8 +109,8 @@ GO.zpush.DeviceGrid = function(config) {
                 }
             ]
     );
-    DeviceModule.defaultSortable = true;
-    config.cm = DeviceModule;
+    DeviceModel.defaultSortable = true;
+    config.cm = DeviceModel;
 
     config.view = new Ext.grid.GridView({
         emptyText: GO.lang['strNoItems']
@@ -135,7 +133,7 @@ GO.zpush.DeviceGrid = function(config) {
 
     config.tbar = [
         {
-            id: 'refresh',
+            itemId: 'refresh',
             xtype: 'button',
             text: GO.zpush.lang.deviceGrid.buttons.refresh,
             iconCls: 'btn-refresh',
@@ -148,7 +146,7 @@ GO.zpush.DeviceGrid = function(config) {
             xtype: 'tbseparator'
         },
         {
-            id: 'remove',
+            itemId: 'remove',
             xtype: 'button',
             text: GO.zpush.lang.deviceGrid.buttons.remove,
             iconCls: 'btn-delete',
@@ -157,8 +155,8 @@ GO.zpush.DeviceGrid = function(config) {
             handler: function(btn) {
                 GO.deleteItems({
                     url:GO.settings.modules['z-push'].url + 'action.php',
-                    params:{
-                        task:'delete_device',
+                    params: {
+                        task: 'delete_device',
                         id: this.getSelectionModel().getSelected()['id']
                     },
                     count:1,
@@ -173,14 +171,27 @@ GO.zpush.DeviceGrid = function(config) {
             }
         },
         {
-            id: 'wipe',
+            itemId: 'wipe',
             xtype :'button',
             text: GO.zpush.lang.deviceGrid.buttons.wipe,
             iconCls :'btn-dismiss',
             disabled:true,
             scope: this,
             handler: function(btn) {
-                this.store.load();
+                Ext.Ajax.request({
+                    scope:this,
+                    url: GO.settings.modules['z-push'].url + 'action.php',
+                    params: {
+                        task: 'wipe_device',
+                        id: this.getSelectionModel().getSelected()['id']
+                    },
+                    callback: function(options, success, response) {
+                        var responseParams = Ext.decode(response.responseText);
+                        if (responseParams.success) {
+                            this.store.load();
+                        }
+                    }
+                });
             }
         }
     ];

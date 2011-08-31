@@ -71,7 +71,7 @@ class zpush extends db
     {
         $this->query("SELECT addressbook_id FROM as_default_addressbook WHERE user_id=?", array('i'), array($userid));
         $result = $this->next_record();
-        if (result == null)
+        if ($result == null)
             return null;
         return $result['addressbook_id'];
     }

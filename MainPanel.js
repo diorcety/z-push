@@ -9,18 +9,18 @@ GO.zpush.MainPanel = function(config) {
         config = {};
     }
 
-    var centerPanel = new GO.zpush.DeviceGrid({
-        region:'center',
-        autoScroll:true,
-        width:250,
-        split:true
-    });
-
     config.items = [
-        centerPanel
+        new GO.zpush.AddressBookGrid({
+            fieldLabel:GO.zpush.lang.addressBookGrid.title,
+            height: 200
+        }),
+        new GO.zpush.DeviceGrid({
+            fieldLabel:GO.zpush.lang.deviceGrid.title,
+            height: 200
+        })
     ];
-
-    config.layout = 'border';
+    config.padding = 10;
+    config.labelWidth = 200;
 
     GO.zpush.MainPanel.superclass.constructor.call(this, config);
 };
@@ -28,7 +28,7 @@ GO.zpush.MainPanel = function(config) {
 /*
  * Extend the base class
  */
-Ext.extend(GO.zpush.MainPanel, Ext.Panel, {
+Ext.extend(GO.zpush.MainPanel, Ext.form.FormPanel, {
 
 });
 

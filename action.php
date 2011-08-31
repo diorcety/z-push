@@ -33,6 +33,14 @@ try {
                 $response['success'] = $result;
             }
             break;
+        case 'wipe_device':
+            $id = isset($_REQUEST['id']) ? ($_REQUEST['id']) : null;
+            if ($id !== null) {
+                // Wipe
+                $result = $GO_AS->setStatus($GO_SECURITY->user_id, $id, 2);
+                $response['success'] = $result;
+            }
+            break;
         /* {TASKSWITCH} */
     }
 } catch (Exception $e)

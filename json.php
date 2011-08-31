@@ -20,6 +20,7 @@ require_once($GO_MODULES->modules['z-push']['class_path'] . 'zpush.class.inc.php
 require_once($GO_MODULES->modules['addressbook']['class_path'] . 'addressbook.class.inc.php');
 
 $GO_AS = new zpush();
+$GO_ADDRESSBOOK = new addressbook();
 
 $task = isset($_REQUEST['task']) ? ($_REQUEST['task']) : '';
 
@@ -31,8 +32,9 @@ try {
             $response['results'] = array();
             foreach ($GO_AS->getDevices($GO_SECURITY->user_id) as $deviceid)
             {
-                $device = array();
                 $result = $GO_AS->getDevice($GO_SECURITY->user_id, $deviceid);
+
+                $device = array();
                 $device['id'] = $result['device_id'];
                 $device['device'] = $result['device'];
                 $device['agent'] = $result['agent'];
@@ -42,6 +44,46 @@ try {
                 $response['results'][] = $device;
             }
             $response['total'] = sizeof($response['results']);
+            $response['success'] = true;
+            break;
+
+        case 'addressbooks':
+            // Commit
+            if (isset($_REQUEST['results'])) {
+                $results = json_decode($_REQUEST['results'], true);
+                foreach ($results as $addressbook)
+                {
+                    if ($addressbook['default']) {
+                        $GO_AS->setDefaultAddressBook($GO_SECURITY->user_id, $addressbook['id']);
+                    }
+                    if ($addressbook['synchronize']) {
+                        $GO_AS->addAddressBook($GO_SECURITY->user_id, $addressbook['id']);
+                    } else {
+                        $GO_AS->removeAddressBook($GO_SECURITY->user_id, $addressbook['id']);
+                    }
+                }
+                $response['success'] = true;
+            } else {
+                $response['results'] = array();
+                $synchronized = $GO_AS->getAddressBooks($GO_SECURITY->user_id);
+                $default = $GO_AS->getDefaultAddressBook($GO_SECURITY->user_id);
+
+                $GO_ADDRESSBOOK->get_user_addressbooks($GO_SECURITY->user_id);
+                while ($GO_ADDRESSBOOK->next_record())
+                {
+                    $result = $GO_ADDRESSBOOK->record;
+
+                    $addressbook = array();
+                    $addressbook['id'] = $result['id'];
+                    $addressbook['name'] = $result['name'];
+                    $addressbook['synchronized'] = in_array($result['id'], $synchronized);
+                    $addressbook['default'] = ($default == $result['id']) ? true : false;
+
+                    $response['results'][] = $addressbook;
+                }
+                $response['total'] = sizeof($response['results']);
+                $response['success'] = true;
+            }
             break;
         /* {TASKSWITCH} */
     }
