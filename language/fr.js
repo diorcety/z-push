@@ -43,3 +43,15 @@ GO.zpush.lang.addressBookGrid.columns['default'] = "Défaut";
 GO.zpush.lang.addressBookGrid.buttons = {};
 GO.zpush.lang.addressBookGrid.buttons.refresh = "Rafraîchir";
 GO.zpush.lang.addressBookGrid.buttons.save = "Sauvegarder";
+
+GO.zpush.lang.calendarGrid = {};
+GO.zpush.lang.calendarGrid.title = "Calendriers";
+
+GO.zpush.lang.calendarGrid.columns = {};
+GO.zpush.lang.calendarGrid.columns.name = "Nom du calendrier";
+GO.zpush.lang.calendarGrid.columns.synchronize = "Synchroniser";
+GO.zpush.lang.calendarGrid.columns['default'] = "Défaut";
+
+GO.zpush.lang.calendarGrid.buttons = {};
+GO.zpush.lang.calendarGrid.buttons.refresh = "Rafraîchir";
+GO.zpush.lang.calendarGrid.buttons.save = "Sauvegarder";

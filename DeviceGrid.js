@@ -11,7 +11,7 @@ GO.zpush.DeviceGrid = function(config) {
     }
 
     config.autoScroll = true;
-    
+
     config.store = new GO.data.JsonStore({
         /*
          * Here we store our remotely-loaded JSON data from json.php?task=devices
@@ -23,7 +23,14 @@ GO.zpush.DeviceGrid = function(config) {
         root: 'results',
         id: 'id',
         totalProperty:'total',
-        fields: ['id','device','agent','first_sync','last_sync','status']
+        fields: [
+            {name: 'id', type: 'string'},
+            {name: 'device', type: 'string'},
+            {name: 'agent', type: 'string'},
+            {name: 'first_sync', type: 'date', dateFormat: 'Y-m-d H:i:s'},
+            {name: 'last_sync', type: 'date', dateFormat: 'Y-m-d H:i:s'},
+            {name: 'status', type: 'integer'}
+        ]
     });
 
     /*

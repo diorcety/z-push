@@ -89,12 +89,47 @@ class zpush extends db
 
     function addAddressBook($userid, $addressbookid)
     {
-        return $this->query("INSERT INTO as_addressbooks (user_id, addressbook_id) VALUES (?,?)", array('i', 'i'), array($userid, $addressbookid));
+        return $this->query("INSERT IGNORE INTO as_addressbooks (user_id, addressbook_id) VALUES (?,?)", array('i', 'i'), array($userid, $addressbookid));
     }
 
     function removeAddressBook($userid, $addressbookid)
     {
         return $this->query("DELETE FROM as_addressbooks WHERE user_id=? AND addressbook_id=?", array('i', 'i'), array($userid, $addressbookid));
+    }
+
+    function setDefaultCalendar($userid, $calendarid)
+    {
+        return $this->query("INSERT INTO as_default_calendar (user_id, calendar_id) VALUES (?,?) ON DUPLICATE KEY UPDATE calendar_id=?", array('i', 'i', 'i'), array($userid, $calendarid, $calendarid));
+    }
+
+    function getDefaultCalendar($userid)
+    {
+        $this->query("SELECT calendar_id FROM as_default_calendar WHERE user_id=?", array('i'), array($userid));
+        $result = $this->next_record();
+        if ($result == null)
+            return null;
+        return $result['calendar_id'];
+    }
+
+    function getCalendars($userid)
+    {
+        $this->query("SELECT calendar_id FROM as_calendars WHERE user_id=?", array('i'), array($userid));
+        $result = Array();
+        while ($record = $this->next_record())
+        {
+            $result [] = $record['calendar_id'];
+        }
+        return $result;
+    }
+
+    function addCalendar($userid, $calendarid)
+    {
+        return $this->query("INSERT IGNORE INTO as_calendars (user_id, calendar_id) VALUES (?,?)", array('i', 'i'), array($userid, $calendarid));
+    }
+
+    function removeCalendar($userid, $calendarid)
+    {
+        return $this->query("DELETE FROM as_calendars WHERE user_id=? AND calendar_id=?", array('i', 'i'), array($userid, $calendarid));
     }
 }
 

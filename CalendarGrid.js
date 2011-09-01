@@ -4,7 +4,7 @@ Ext.namespace('GO.z-push');
 /*
  * This is the constructor of our PresidentsGrid
  */
-GO.zpush.AddressBookGrid = function(config) {
+GO.zpush.CalendarGrid = function(config) {
 
     if (!config) {
         config = {};
@@ -18,7 +18,7 @@ GO.zpush.AddressBookGrid = function(config) {
          */
         url: GO.settings.modules['z-push'].url + 'json.php',
         baseParams: {
-            task: 'addressbooks'
+            task: 'calendars'
         },
         autoSave : false,
         writer: new Ext.data.JsonWriter({
@@ -38,7 +38,7 @@ GO.zpush.AddressBookGrid = function(config) {
     });
 
     var synchronizeColumn = new GO.grid.CheckColumn({
-        header: GO.zpush.lang.addressBookGrid.columns.synchronize,
+        header: GO.zpush.lang.calendarGrid.columns.synchronize,
         dataIndex: 'synchronize',
         disabled_field: 'default',
         width: 120,
@@ -55,7 +55,7 @@ GO.zpush.AddressBookGrid = function(config) {
             } else {
                 if (!GO.util.empty(v)) {
                     on = '-on';
-                } else {
+                }  else {
                     on = '';
                 }
             }
@@ -64,7 +64,7 @@ GO.zpush.AddressBookGrid = function(config) {
         }
     });
     var defaultColumn = new GO.grid.RadioColumn({
-        header: GO.zpush.lang.addressBookGrid.columns['default'],
+        header: GO.zpush.lang.calendarGrid.columns['default'],
         dataIndex: 'default',
         width: 120,
         sortable: false,
@@ -73,10 +73,10 @@ GO.zpush.AddressBookGrid = function(config) {
     /*
      * ColumnModel used by our DeviceGrid
      */
-    var AddressBookModel = new Ext.grid.ColumnModel(
+    var CalendarModel = new Ext.grid.ColumnModel(
             [
                 {
-                    header: GO.zpush.lang.addressBookGrid.columns.name,
+                    header: GO.zpush.lang.calendarGrid.columns.name,
                     readOnly: true,
                     dataIndex: 'name',
                     renderer: function(value, cell) {
@@ -84,14 +84,14 @@ GO.zpush.AddressBookGrid = function(config) {
                         return value;
                     },
                     width: 120,
-                    sortable: false
+                    sortable: true
                 },
                 synchronizeColumn,
                 defaultColumn
             ]
     );
-    AddressBookModel.defaultSortable = true;
-    config.cm = AddressBookModel;
+    CalendarModel.defaultSortable = true;
+    config.cm = CalendarModel;
 
     config.view = new Ext.grid.GridView({
         emptyText: GO.lang['strNoItems']
@@ -104,7 +104,7 @@ GO.zpush.AddressBookGrid = function(config) {
         {
             itemId: 'refresh',
             xtype: 'button',
-            text: GO.zpush.lang.addressBookGrid.buttons.refresh,
+            text: GO.zpush.lang.calendarGrid.buttons.refresh,
             iconCls: 'btn-refresh',
             scope: this,
             handler: function(btn) {
@@ -117,7 +117,7 @@ GO.zpush.AddressBookGrid = function(config) {
         {
             itemId: 'save',
             xtype: 'button',
-            text: GO.zpush.lang.addressBookGrid.buttons.save,
+            text: GO.zpush.lang.calendarGrid.buttons.save,
             iconCls: 'btn-save',
             scope: this,
             handler: function(btn) {
@@ -130,19 +130,19 @@ GO.zpush.AddressBookGrid = function(config) {
     /*
      * explicitly call the superclass constructor
      */
-    GO.zpush.AddressBookGrid.superclass.constructor.call(this, config);
+    GO.zpush.CalendarGrid.superclass.constructor.call(this, config);
 
 };
 
 /*
  * Extend the base class
  */
-Ext.extend(GO.zpush.AddressBookGrid, GO.grid.GridPanel, {
+Ext.extend(GO.zpush.CalendarGrid, GO.grid.GridPanel, {
 
     loaded : false,
 
     afterRender : function() {
-        GO.zpush.AddressBookGrid.superclass.afterRender.call(this);
+        GO.zpush.CalendarGrid.superclass.afterRender.call(this);
 
         if (this.isVisible()) {
             this.onGridShow();

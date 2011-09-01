@@ -1,3 +1,4 @@
 modules/z-push/MainPanel.js
 modules/z-push/DeviceGrid.js
 modules/z-push/AddressBookGrid.js
+modules/z-push/CalendarGrid.js

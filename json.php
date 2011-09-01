@@ -18,9 +18,11 @@ $GO_SECURITY->json_authenticate('z-push');
 
 require_once($GO_MODULES->modules['z-push']['class_path'] . 'zpush.class.inc.php');
 require_once($GO_MODULES->modules['addressbook']['class_path'] . 'addressbook.class.inc.php');
+require_once($GO_MODULES->modules['calendar']['class_path'] . 'calendar.class.inc.php');
 
 $GO_AS = new zpush();
 $GO_ADDRESSBOOK = new addressbook();
+$GO_CALENDAR = new calendar();
 
 $task = isset($_REQUEST['task']) ? ($_REQUEST['task']) : '';
 
@@ -55,11 +57,13 @@ try {
                 {
                     if ($addressbook['default']) {
                         $GO_AS->setDefaultAddressBook($GO_SECURITY->user_id, $addressbook['id']);
-                    }
-                    if ($addressbook['synchronize']) {
-                        $GO_AS->addAddressBook($GO_SECURITY->user_id, $addressbook['id']);
-                    } else {
                         $GO_AS->removeAddressBook($GO_SECURITY->user_id, $addressbook['id']);
+                    } else {
+                        if ($addressbook['synchronize']) {
+                            $GO_AS->addAddressBook($GO_SECURITY->user_id, $addressbook['id']);
+                        } else {
+                            $GO_AS->removeAddressBook($GO_SECURITY->user_id, $addressbook['id']);
+                        }
                     }
                 }
                 $response['success'] = true;
@@ -76,10 +80,52 @@ try {
                     $addressbook = array();
                     $addressbook['id'] = $result['id'];
                     $addressbook['name'] = $result['name'];
-                    $addressbook['synchronized'] = in_array($result['id'], $synchronized);
+                    $addressbook['synchronize'] = in_array($result['id'], $synchronized);
                     $addressbook['default'] = ($default == $result['id']) ? true : false;
 
                     $response['results'][] = $addressbook;
+                }
+                $response['total'] = sizeof($response['results']);
+                $response['success'] = true;
+            }
+            break;
+
+        case 'calendars':
+            // Commit
+            if (isset($_REQUEST['results'])) {
+                $results = json_decode($_REQUEST['results'], true);
+                foreach ($results as $calendar)
+                {
+                    if ($calendar['default']) {
+                        $GO_AS->setDefaultCalendar($GO_SECURITY->user_id, $calendar['id']);
+                        $GO_AS->removeCalendar($GO_SECURITY->user_id, $calendar['id']);
+                    }
+                    else {
+                        if ($calendar['synchronize']) {
+                            $GO_AS->addCalendar($GO_SECURITY->user_id, $calendar['id']);
+                        } else {
+                            $GO_AS->removeCalendar($GO_SECURITY->user_id, $calendar['id']);
+                        }
+                    }
+                }
+                $response['success'] = true;
+            } else {
+                $response['results'] = array();
+                $synchronized = $GO_AS->getCalendars($GO_SECURITY->user_id);
+                $default = $GO_AS->getDefaultCalendar($GO_SECURITY->user_id);
+
+                $GO_CALENDAR->get_user_calendars($GO_SECURITY->user_id);
+                while ($GO_CALENDAR->next_record())
+                {
+                    $result = $GO_CALENDAR->record;
+
+                    $calendar = array();
+                    $calendar['id'] = $result['id'];
+                    $calendar['name'] = $result['name'];
+                    $calendar['synchronize'] = in_array($result['id'], $synchronized);
+                    $calendar['default'] = ($default == $result['id']) ? true : false;
+
+                    $response['results'][] = $calendar;
                 }
                 $response['total'] = sizeof($response['results']);
                 $response['success'] = true;

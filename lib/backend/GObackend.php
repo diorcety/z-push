@@ -288,7 +288,7 @@ class GOBackend extends BackendDiff
 
     function GetMessageList($uri, $cutoffdate)
     {
-        $this->log("Get Message List $uri ($cutoffdate)");
+        $this->log("Get Message List \"$uri\" ($cutoffdate)");
 
         $messages = array();
         if ($this->isCalendars($uri)) {

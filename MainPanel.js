@@ -10,6 +10,10 @@ GO.zpush.MainPanel = function(config) {
     }
 
     config.items = [
+        new GO.zpush.CalendarGrid({
+            fieldLabel:GO.zpush.lang.calendarGrid.title,
+            height: 200
+        }),
         new GO.zpush.AddressBookGrid({
             fieldLabel:GO.zpush.lang.addressBookGrid.title,
             height: 200
@@ -21,6 +25,7 @@ GO.zpush.MainPanel = function(config) {
     ];
     config.padding = 10;
     config.labelWidth = 200;
+    config.autoScroll = true;
 
     GO.zpush.MainPanel.superclass.constructor.call(this, config);
 };
