@@ -37,7 +37,7 @@ GO.zpush.lang.addressBookGrid.title = "Adressbücher";
 
 GO.zpush.lang.addressBookGrid.columns = {};
 GO.zpush.lang.addressBookGrid.columns.name = "Adressbuch-Name";
-GO.zpush.lang.addressBookGrid.columns.synchronize = "Synchronisieren;
+GO.zpush.lang.addressBookGrid.columns.synchronize = "Synchronisieren";
 GO.zpush.lang.addressBookGrid.columns['default'] = "Voreinstellung";
 
 GO.zpush.lang.addressBookGrid.buttons = {};
