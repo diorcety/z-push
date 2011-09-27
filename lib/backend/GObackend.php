@@ -573,7 +573,7 @@ class GOBackend extends BackendDiff
         if (GO_LOGFILE != '') {
             @$fp = fopen(GO_LOGFILE, 'a+');
             @$date = strftime('%x %X');
-            @fwrite($fp, "$date ['. getmypid() .'] : $message\n");
+            @fwrite($fp, "$date [". getmypid() ."] : $message\n");
             @fclose($fp);
         }
     }
