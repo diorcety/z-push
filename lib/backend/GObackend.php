@@ -183,7 +183,7 @@ class GOBackend extends BackendDiff
      */
     function GetFolder($uri)
     {
-        $this->log("Get Folder $uri");
+        $this->log("Get Folder \"$uri\"");
 
         $folder = new SyncFolder();
         $folder->serverid = $uri;
@@ -225,7 +225,6 @@ class GOBackend extends BackendDiff
 
         return $folder;
     }
-
 
     function getFolderParent($id)
     {
@@ -480,6 +479,7 @@ class GOBackend extends BackendDiff
         }
 
         $key = $this->GO_AS->getPolicyKey($this->_userid, $devid);
+        $this->log("Get $this->_username@$this->_domain device $devid police key: $key");
 
         // Generate new key
         if ($key === null) {
@@ -530,6 +530,7 @@ class GOBackend extends BackendDiff
         }
 
         $status = $this->GO_AS->getStatus($this->_userid, $devid);
+        $this->log("Get $this->_username@$this->_domain device $devid status: $status");
         if ($status !== null)
             return $status;
 
