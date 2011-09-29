@@ -249,6 +249,8 @@ class MAPIMapping {
                             "rtf" => PR_RTF_COMPRESSED,
                             );
 
+    var $_zRFC822;
+
     // Sets the properties in a MAPI object according to an Sync object and a property mapping
     function _setPropsInMAPI($mapimessage, $message, $mapping) {
         foreach ($mapping as $asprop => $mapiprop) {
@@ -292,6 +294,12 @@ class MAPIMapping {
                 }
 
                 mapi_setprops($mapimessage, array($mapiprop => $value));
+
+                // fixes Mantis #468
+                if (is_array($value) && empty($value)) {
+                    debugLog(sprintf("mapi_deleteprops() for '%s' as it is an empty array", $asprop));
+                    mapi_deleteprops($mapimessage, array($mapiprop));
+                }
             }
         }
 
@@ -502,6 +510,16 @@ class MAPIMapping {
 
         return "";
     }
+
+    //some devices send email address as "Firstname Lastname" <email@me.com>
+    //@link http://developer.berlios.de/mantis/view.php?id=486
+    function _extractEmailAddress($email) {
+        if (!isset($this->_zRFC822)) $this->_zRFC822 = new Mail_RFC822();
+        $parsedAddress = $this->_zRFC822->parseAddressList($email);
+        if (!isset($parsedAddress[0]->mailbox) || !isset($parsedAddress[0]->host)) return false;
+
+        return $parsedAddress[0]->mailbox.'@'.$parsedAddress[0]->host;
+    }
 }
 
 // This is our local importer. IE it receives data from the PDA. It must therefore receive Sync
@@ -569,7 +587,7 @@ class ImportContentsChangesICS extends MAPIMapping {
     // process potential conflicts only when really necessary (ADD/MODIFY)
     function _lazyLoadConflicts() {
         if (!isset($this->_session) || !isset($this->_store) || !isset($this->_folderid) ||
-            !$this->_conflictsMclass || !$this->_conflictsFiltertype || !$this->_conflictsState) {
+            $this->_conflictsMclass === false || $this->_conflictsState === false) {
             debugLog("Warning: can not load changes in lazymode for conflict detection. Missing information");
             return false;
         }
@@ -636,12 +654,22 @@ class ImportContentsChangesICS extends MAPIMapping {
         if($this->_memChanges->isChanged($objid)) {
            debugLog("Conflict detected. Data from Server will be dropped! PIM deleted object.");
         }
+        elseif($this->_memChanges->isDeleted($objid)) {
+            debugLog("Conflict detected. Data is already deleted. Request will be ignored.");
+            return true;
+        }
         // do a 'soft' delete so people can un-delete if necessary
         mapi_importcontentschanges_importmessagedeletion($this->importer, 1, array(hex2bin($objid)));
     }
 
     // Import a change in 'read' flags .. This can never conflict
     function ImportMessageReadFlag($id, $flags) {
+        $this->_lazyLoadConflicts();
+        if($this->_memChanges->isDeleted($id)) {
+            debugLog("Conflict detected. Data is already deleted. Request will be ignored.");
+            return true;
+        }
+
         $readstate = array ( "sourcekey" => hex2bin($id), "flags" => $flags);
         $ret = mapi_importcontentschanges_importperuserreadstatechange($this->importer, array ($readstate) );
         if($ret == false)
@@ -1030,6 +1058,16 @@ class ImportContentsChangesICS extends MAPIMapping {
     function _setContact($mapimessage, $contact) {
         mapi_setprops($mapimessage, array(PR_MESSAGE_CLASS => "IPM.Contact"));
 
+        // normalize email addresses
+        if (isset($contact->email1address) && (($contact->email1address = $this->_extractEmailAddress($contact->email1address)) === false))
+            unset($contact->email1address);
+
+        if (isset($contact->email2address) && (($contact->email2address = $this->_extractEmailAddress($contact->email2address)) === false))
+            unset($contact->email2address);
+
+        if (isset($contact->email3address) && (($contact->email3address = $this->_extractEmailAddress($contact->email3address)) === false))
+            unset($contact->email3address);
+
         $this->_setPropsInMAPI($mapimessage, $contact, $this->_contactmapping);
 
         // Set display name and subject to a combined value of firstname and lastname
@@ -1044,6 +1082,7 @@ class ImportContentsChangesICS extends MAPIMapping {
         $props = array();
         $nremails = array();
         $abprovidertype = 0;
+
         if (isset($contact->email1address)) {
             $nremails[] = 0;
             $abprovidertype |= 1;
@@ -1513,7 +1552,7 @@ class PHPContentsImportProxy extends MAPIMapping {
             // don't send one of those fields, the phone will give an error ... so
             // we don't send it in that case.
             // also ignore the "attendee" if the email is equal to the organizers' email
-            if(isset($attendee->name) && isset($attendee->email) && (!isset($message->organizeremail) || (isset($message->organizeremail) && $attendee->email != $message->organizeremail)))
+            if(isset($attendee->name) && isset($attendee->email) && $attendee->email != "" && (!isset($message->organizeremail) || (isset($message->organizeremail) && $attendee->email != $message->organizeremail)))
                 array_push($message->attendees, $attendee);
         }
         // Force the 'alldayevent' in the object at all times. (non-existent == 0)
@@ -2640,7 +2679,7 @@ class BackendICS {
             if (strlen(trim($items[$i][SYNC_GAL_DISPLAYNAME])) == 0)
                 $items[$i][SYNC_GAL_DISPLAYNAME] = w2u($abentries[$i][PR_ACCOUNT]);
 
-            $items[$i][SYNC_GAL_ALIAS] = $items[$i][PR_ACCOUNT];
+            $items[$i][SYNC_GAL_ALIAS] = w2u($abentries[$i][PR_ACCOUNT]);
             //it's not possible not get first and last name of an user
             //from the gab and user functions, so we just set lastname
             //to displayname and leave firstname unset
@@ -3142,20 +3181,22 @@ class BackendICS {
             $goidprop = GetPropIDFromString($this->_defaultstore, "PT_BINARY:{6ED8DA90-450B-101B-98DA-00AA003F1305}:0x3");
 
             $messageprops = mapi_getprops($mapimessage, Array($goidprop, PR_OWNER_APPT_ID));
-                $goid = $messageprops[$goidprop];
-                if(isset($messageprops[PR_OWNER_APPT_ID]))
-                    $apptid = $messageprops[PR_OWNER_APPT_ID];
-                else
-                    $apptid = false;
+            $goid = $messageprops[$goidprop];
+            if(isset($messageprops[PR_OWNER_APPT_ID]))
+                $apptid = $messageprops[PR_OWNER_APPT_ID];
+            else
+                $apptid = false;
 
-                $items = $meetingrequest->findCalendarItems($goid, $apptid);
 
-                if (is_array($items)) {
-                   $newitem = mapi_msgstore_openentry($this->_defaultstore, $items[0]);
-                   $newprops = mapi_getprops($newitem, array(PR_SOURCE_KEY));
-                   $calendarid = bin2hex($newprops[PR_SOURCE_KEY]);
-                   debugLog("found other calendar entryid");
-                }
+            //findCalendarItems signature was changed in 6.40.8, Mantis #485
+            $items = (checkMapiExtVersion("6.40.8")) ? $meetingrequest->findCalendarItems($goid) : $meetingrequest->findCalendarItems($goid, $apptid);
+
+            if (is_array($items)) {
+               $newitem = mapi_msgstore_openentry($this->_defaultstore, $items[0]);
+               $newprops = mapi_getprops($newitem, array(PR_SOURCE_KEY));
+               $calendarid = bin2hex($newprops[PR_SOURCE_KEY]);
+               debugLog("found other calendar entryid");
+            }
         }
 
 
