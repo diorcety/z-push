@@ -33,6 +33,7 @@ class GOBackend extends BackendDiff
     var $_protocolversion = null;
     var $GO_AS;
     var $GO_ADDRESSBOOK;
+    var $GO_CALENDAR;
 
     function GOBackend()
     {
@@ -41,15 +42,20 @@ class GOBackend extends BackendDiff
 
         global $GO_CONFIG;
         global $GO_MODULES;
+        global $GO_EVENTS;
 
+        $GO_EVENTS = new GO_EVENTS(); //Avoid send_event issues
         if (!isset($GO_MODULES->modules['z-push']))
             die('Z-Push module is not installed. Install it at Start menu -> Modules');
 
         // Create Connectors
         require_once($GO_MODULES->modules['z-push']['class_path'] . 'zpush.class.inc.php');
         require_once($GO_MODULES->modules['addressbook']['class_path'] . 'addressbook.class.inc.php');
+        require_once($GO_MODULES->modules['calendar']['class_path'] . 'calendar.class.inc.php');
+
         $this->GO_AS = new zpush();
         $this->GO_ADDRESSBOOK = new addressbook();
+        $this->GO_CALENDAR = new calendar();
     }
 
     function Logon($username, $domain, $password)
@@ -128,6 +134,10 @@ class GOBackend extends BackendDiff
 
         //Add Calendars
         $folders[] = $this->StatFolder(self::FOLDER_CALANDAR);
+        foreach ($this->GO_AS->getCalendars($this->_userid) as $calendarId)
+        {
+            $folders[] = $this->StatFolder(self::FOLDER_CALANDAR . '/' . $calendarId);
+        }
 
         //Add AddressBooks
         $folders[] = $this->StatFolder(self::FOLDER_CONTACTS);
@@ -174,6 +184,20 @@ class GOBackend extends BackendDiff
         return $addressBookId;
     }
 
+    function getCalendarId($uri)
+    {
+        if ($uri == self::FOLDER_CALANDAR) {
+            $calendarId = $this->GO_AS->getDefaultCalendar($this->_userid);
+            if ($calendarId == null) {
+                $this->log('Warning! No default Calandar!');
+                return null;
+            }
+        } else {
+            $calendarId = $this->getFolderId($uri);
+        }
+        return $calendarId;
+    }
+
     /**
      * Retrieve folder
      *
@@ -191,13 +215,18 @@ class GOBackend extends BackendDiff
 
         if ($this->isCalendars($uri)) {
             // CALENDARS
-            if ($uri == self::FOLDER_CALANDAR) {
-                $folder->displayname = $this->getFolderId($uri);
+            if ($uri == self::FOLDER_CALANDAR)
                 $folder->type = SYNC_FOLDER_TYPE_APPOINTMENT;
-            } else {
-                $folder->displayname = $this->getFolderId($uri);
+            else
                 $folder->type = SYNC_FOLDER_TYPE_USER_APPOINTMENT;
+
+            $calendarId = $this->getCalendarId($uri);
+            $calendar = $this->GO_CALENDAR->get_calendar($calendarId);
+            if ($calendar == null) {
+                $this->log('Error! Invalid Calendar: ' . $calendarId);
+                return null;
             }
+            $folder->displayname = $calendar['name'];
         } else if ($this->isContacts($uri)) {
             // CONTACTS
             if ($uri == self::FOLDER_CONTACTS)
@@ -291,8 +320,16 @@ class GOBackend extends BackendDiff
 
         $messages = array();
         if ($this->isCalendars($uri)) {
-            if ($uri == self::FOLDER_CALANDAR) {
-            } else {
+            $calendarId = $this->getCalendarId($uri);
+            $this->GO_CALENDAR->get_events(array($calendarId)); // HANDLE cutoffdate !
+            while ($record = $this->GO_CALENDAR->next_record())
+            {
+                $message = array();
+                $message['mod'] = $record['mtime'];
+                $message['id'] = $record['id'];
+                $message['flags'] = 0;
+
+                $messages[] = $message;
             }
         } else if ($this->isContacts($uri)) {
             $addressBookId = $this->getAddressBookId($uri);
@@ -364,6 +401,7 @@ class GOBackend extends BackendDiff
             $vars['id'] = $id;
         $vars['addressbook_id'] = $addressbookId;
         $vars['user_id'] = $this->_userid;
+
         $vars['first_name'] = $contact->firstname;
         $vars['middle_name'] = $contact->middlename;
         $vars['last_name'] = $contact->lastname;
@@ -388,17 +426,119 @@ class GOBackend extends BackendDiff
         return $vars;
     }
 
+    function CreateSyncEvent($vars)
+    {
+        $participants = $this->GO_CALENDAR->get_participants($vars['id']);
+
+        $attendees = array();
+        $organizer = null;
+        foreach ($participants as $part)
+        {
+            if ($part['is_organizer']) {
+                $organizer = $part;
+            } else {
+                $attendee = new SyncAttendee();
+                $attendee->name = $part['name'];
+                $attendee->email = $part['email'];
+                $attendees [] = $attendee;
+            }
+        }
+
+        $event = new SyncAppointment();
+        //timezone must be fixed
+        $event->timezone = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
+        $event->dtstamp = time();
+        $event->starttime = $vars['start_time'];
+        $event->subject = $vars['name'];
+        $event->uid = $vars['uuid'];
+        if ($organizer != null) {
+            $event->organizername = $organizer['name'];
+            $event->organizeremail = $organizer['email'];
+        }
+        $event->location = $vars['location'];
+        $event->endtime = $vars['end_time'];
+        //recurrence
+        $event->sensitivity = $vars['private'] ? 2 : 0;
+        $event->busystatus = $vars['busy'] ? 2 : 0;
+        $event->alldayevent = $vars['all_day_event'];
+        $event->reminder = $vars['reminder'];
+        $event->meetingstatus = 0;
+        if ($vars['status'] == 'NEEDS-ACTION') {
+
+        }
+        else if ($vars['status'] == 'ACCEPTED') {
+          //  $event->meetingstatus += 3;
+        }
+        else if ($vars['status'] == 'DECLINED') {
+          //  $event->meetingstatus += 5;
+        }
+        else if ($vars['status'] == 'TENTATIVE') {
+         //   $event->meetingstatus += 7;
+
+        }
+        else if ($vars['status'] == 'DELEGATED') {
+
+        }
+
+        //$event->attendees = $attendees;
+        $event->body = $vars['description'];
+        //exceptions
+        //deleted
+        //exceptionstarttime
+        //categories
+        return $event;
+    }
+
+    function CreateGOEvent($event, $calendarId, $id = false)
+    {
+        $vars = Array();
+
+        if ($id != false)
+            $vars['id'] = $id;
+        $vars['calendar_id'] = $calendarId;
+        $vars['user_id'] = $this->_userid;
+
+        //timezone
+        //dtstamp
+        $vars['start_time'] = $event->starttime;
+        $vars['name'] = $event->subject;
+        $vars['uuid'] = $event->uid;
+        //organizername
+        //organizeremail
+        $vars['location'] = $event->location;
+        $vars['end_time'] = $event->endtime;
+        //recurrence
+        //sensitivity
+        //busystatus
+        $vars['all_day_event'] = $event->alldayevent;
+        $vars['reminder'] = $event->reminder;
+        //meetingstatus
+        //attendees
+        $vars['description'] = $event->body;
+        //bodytruncated
+        //exceptions
+        //deleted
+        //exceptionstarttime
+        //categories
+
+        return $vars;
+    }
+
     function GetMessage($uri, $id, $truncsize, $mimesupport = 0)
     {
         $this->log("Get Message $id from $uri");
 
         if ($this->isCalendars($uri)) {
+            $record = $this->GO_CALENDAR->get_event($id);
+            if ($record != null)
+                return $this->CreateSyncEvent($record);
         } else if ($this->isContacts($uri)) {
             $record = $this->GO_ADDRESSBOOK->get_contact($id);
             if ($record != null)
                 return $this->CreateSyncContact($record);
         } else if ($this->isTasks($uri)) {
         }
+
         return null;
     }
 
@@ -407,6 +547,7 @@ class GOBackend extends BackendDiff
         $this->log("Delete Message $id from $uri");
 
         if ($this->isCalendars($uri)) {
+            return $this->GO_CALENDAR->delete_event($id) == 1 ? true : false;
         } else if ($this->isContacts($uri)) {
             return $this->GO_ADDRESSBOOK->delete_contact($id) == 1 ? true : false;
         } else if ($this->isTasks($uri)) {
@@ -424,6 +565,14 @@ class GOBackend extends BackendDiff
         $this->log("Change Message $id from $uri");
 
         if ($this->isCalendars($uri)) {
+            $calendarId = $this->getCalendarId($uri);
+            $event = $this->CreateGOEvent($message, $calendarId, $id);
+            if ($id == false) {
+                $id = $this->GO_CALENDAR->add_event($event);
+            } else {
+                $this->GO_CALENDAR->update_event($event);
+            }
+            return $this->StatMessage($uri, $id);
         } else if ($this->isContacts($uri)) {
             $addressBookId = $this->getAddressBookId($uri);
             $contact = $this->CreateGOContact($message, $addressBookId, $id);
@@ -574,7 +723,7 @@ class GOBackend extends BackendDiff
         if (GO_LOGFILE != '') {
             @$fp = fopen(GO_LOGFILE, 'a+');
             @$date = strftime('%x %X');
-            @fwrite($fp, "$date [". getmypid() ."] : $message\n");
+            @fwrite($fp, "$date [" . getmypid() . "] : $message\n");
             @fclose($fp);
         }
     }
